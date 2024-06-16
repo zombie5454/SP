@@ -30,15 +30,19 @@ done
 echo "n_hosts = ${n_hosts} lucky_number = ${lucky_number} n_players = ${n_players}"
 
 ######## FIFO ##########
-
+fifos[10]=''
 for (( i=0 ; i <= ${n_hosts} ; i++ )); do
     filename="fifo_${i}.tmp"
     if [ ! -p ${filename} ]; then
         mkfifo ${filename}
     fi
-    #exec {fifos[${i}]}<>${filename}
+    exec {fifos[${i}]}<>${filename}
 done
 
+####### Running all hosts in the background ########
+for (( i=1 ; i <= ${n_hosts} ; i++)); do
+    ./host -m ${i} -d 0 -l ${lucky_number} &
+done
 ####### Generate Combinations #########
 
 players[8]=''
@@ -50,10 +54,16 @@ function find_next_player() {
     local start=$2
     #echo "player_index = ${player_index}, start = ${start}"
     if [ $player_index -gt 8 ]; then
-        echo "new combination"
-        #echo "players: ${players[1]} ${players[2]} ${players[3]} ${players[4]} ${players[5]} ${players[6]} ${players[7]} ${players[8]}"
-        echo "${players[*]}\n"
-        echo "${players[*]}\n" > "fifo_3.tmp" 
+        local host=0
+        local winner=0
+        local guess=0
+        read host winner guess <&${fifos[0]}
+        echo "host: $host, winner: $winner, guess = $guess"
+        #if [ $winner != -1 ]; then
+        #    echo "winner: $winner, guess = $guess"
+        #fi
+        echo "${players[*]}\n" > "fifo_${host}.tmp"
+        echo "new combination: ${players[*]}, handled by host $host\n"
         #combination_count=$(( $combination_count+1))
         return 
     fi
@@ -68,6 +78,16 @@ function find_next_player() {
 
 find_next_player 1 1
 #echo "combination_count = ${combination_count}"
+for (( i=1 ; i <= ${n_hosts} ; i++ )); do
+    host=0
+    winner=0
+    guess=0
+    read host winner guess <&${fifos[0]}
+    echo "host: $host, winner: $winner, guess = $guess"
+    echo "-1 -1 -1 -1 -1 -1 -1 -1\n" > "fifo_${host}.tmp"
+done
+
+
 
 
 
